@@ -10,7 +10,7 @@ import java.util.UUID;
 
 public class DelayedChunk {
 
-	public final UUID            player;
+	public final UUID player;
 	public final PacketContainer packet;
 	public final int x;
 	public final int z;

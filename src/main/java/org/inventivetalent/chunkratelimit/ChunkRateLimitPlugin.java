@@ -19,15 +19,15 @@ public class ChunkRateLimitPlugin extends JavaPlugin implements Listener {
 
 	private ProtocolManager protocolManager;
 
-	private int                            chunkCounter           = 0;
-	private Deque<DelayedChunk>            delayedChunks          = new ArrayDeque<>();
-	private Map<UUID, Deque<DelayedChunk>> perPlayerDelayedChunks = new HashMap<>();
-	private Set<String>                    processing             = new HashSet<>();
+	private int chunkCounter = 0;
+	private final Deque<DelayedChunk> delayedChunks = new ArrayDeque<>();
+	private final Map<UUID, Deque<DelayedChunk>> perPlayerDelayedChunks = new HashMap<>();
+	private final Set<String> processing = new HashSet<>();
 
-	private int     sendInterval   = 10;
-	private int     sendEach       = 1;
+	private int sendInterval = 10;
+	private int sendEach = 1;
 	private boolean perPlayerQueue = false;
-	private boolean debug          = false;
+	private boolean debug = false;
 
 	@Override
 	public void onEnable() {
@@ -47,7 +47,6 @@ public class ChunkRateLimitPlugin extends JavaPlugin implements Listener {
 				chunkCounter++;
 				if (chunkCounter > 2) {
 					Player player = event.getPlayer();
-					if (!player.hasPermission("chunkratelimit.bypass")) {
 						DelayedChunk chunk = new DelayedChunk(player, event.getPacket());
 						String chunkId = chunk.getId();
 						if (!processing.contains(chunkId)) {
@@ -63,53 +62,46 @@ public class ChunkRateLimitPlugin extends JavaPlugin implements Listener {
 						} else {
 							processing.remove(chunkId);
 						}
-					}
 				}
 			}
 		});
 
-		Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
-			@Override
-			public void run() {
-				for (int i = 0; i < sendEach; i++) {
-					DelayedChunk chunk = null;
-					Player chunkPlayer = null;
-					if (perPlayerQueue) {
-						if (perPlayerDelayedChunks.isEmpty()) { return; }
-						for (UUID uuid : perPlayerDelayedChunks.keySet()) {
-							Deque<DelayedChunk> playerQueue = perPlayerDelayedChunks.get(uuid);
-							if (playerQueue.isEmpty()) { continue; }
-							if (chunkCounter > 0) { chunkCounter--; }
-							chunk = playerQueue.pop();
-							chunkPlayer = chunk.getPlayer();
-							sendChunk(chunk, chunkPlayer);
-						}
-					} else {
-						if (delayedChunks.isEmpty()) { return; }
+		Bukkit.getScheduler().runTaskTimer(this, () -> {
+			for (int i = 0; i < sendEach; i++) {
+				DelayedChunk chunk = null;
+				Player chunkPlayer = null;
+				if (perPlayerQueue) {
+					if (perPlayerDelayedChunks.isEmpty()) { return; }
+					for (UUID uuid : perPlayerDelayedChunks.keySet()) {
+						Deque<DelayedChunk> playerQueue = perPlayerDelayedChunks.get(uuid);
+						if (playerQueue.isEmpty()) { continue; }
 						if (chunkCounter > 0) { chunkCounter--; }
-						int j = 0;
-						while (j++ < 50 && (chunkPlayer == null || !chunkPlayer.isOnline()) && delayedChunks.size() > 0) {
-							chunk = delayedChunks.pop();
-							chunkPlayer = chunk.getPlayer();
-						}
+						chunk = playerQueue.pop();
+						chunkPlayer = chunk.getPlayer();
 						sendChunk(chunk, chunkPlayer);
 					}
+				} else {
+					if (delayedChunks.isEmpty()) { return; }
+					if (chunkCounter > 0) { chunkCounter--; }
+					int j = 0;
+					while (j++ < 50 && (chunkPlayer == null || !chunkPlayer.isOnline()) && delayedChunks.size() > 0) {
+						chunk = delayedChunks.pop();
+						chunkPlayer = chunk.getPlayer();
+					}
+					sendChunk(chunk, chunkPlayer);
 				}
 			}
 		}, sendInterval, sendInterval);
 
 		if (debug) {
-			Bukkit.getScheduler().runTaskTimer(this, new Runnable() {
-				@Override
-				public void run() {
-					if (perPlayerQueue) {
-						getLogger().info("Chunk Queue Sizes: (" + perPlayerDelayedChunks.size() + ")");
-						for (UUID uuid : perPlayerDelayedChunks.keySet()) {
-							getLogger().info("  " + uuid + ": " + perPlayerDelayedChunks.get(uuid).size());
-						}
-					} else {
-						getLogger().info("Chunk Queue Size: " + delayedChunks.size());
+			Bukkit.getScheduler().runTaskTimer(this, () -> {
+				if (perPlayerQueue) {
+					getLogger().info("Chunk Queue Sizes: (" + perPlayerDelayedChunks.size() + ")");
+					for (UUID uuid : perPlayerDelayedChunks.keySet()) {
+						getLogger().info("  " + uuid + ": " + perPlayerDelayedChunks.get(uuid).size());
 					}
+				} else {
+					getLogger().info("Chunk Queue Size: " + delayedChunks.size());
 				}
 			}, 20, 30 * 20);
 		}
